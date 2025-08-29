@@ -171,16 +171,16 @@ class ChatwootService:
     def process_attachment(self, attachment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process Chatwoot attachment with complete parity to monolith"""
         try:
-            logger.info(f"🔍 Processing Chatwoot attachment: {attachment}")
-
+            logger.info(f"Processing Chatwoot attachment: {attachment}")
+    
             # Extract type with multiple methods (EXACTLY like monolith)
             attachment_type = None
-
+    
             # Method 1: file_type (most common in Chatwoot)
             if attachment.get("file_type"):
                 attachment_type = attachment["file_type"].lower()
-                logger.info(f"📝 Type from 'file_type': {attachment_type}")
-
+                logger.info(f"Type from 'file_type': {attachment_type}")
+    
             # Method 2: extension (MISSING in original modular - NOW ADDED)
             elif attachment.get("extension"):
                 ext = attachment["extension"].lower().lstrip('.')
@@ -188,28 +188,28 @@ class ChatwootService:
                     attachment_type = "image"
                 elif ext in ['mp3', 'wav', 'ogg', 'm4a', 'aac']:
                     attachment_type = "audio"
-                logger.info(f"📝 Type inferred from extension '{ext}': {attachment_type}")
-
+                logger.info(f"Type inferred from extension '{ext}': {attachment_type}")
+    
             # Extract URL with correct priority (EXACTLY like monolith)
             url = attachment.get("data_url") or attachment.get("url") or attachment.get("thumb_url")
-
+    
             if not url:
-                logger.warning(f"⚠️ No URL found in attachment")
+                logger.warning(f"No URL found in attachment")
                 return None
-
+    
             # FIXED: Construct full URL if necessary (MISSING in original modular)
             if not url.startswith("http"):
                 # Remove initial slash to avoid double slash
                 if url.startswith("/"):
                     url = url[1:]
-                url = f"{self.base_url}/{url}"
-                logger.info(f"🔗 Full URL constructed: {url}")
-
+                url = f"{self.base_url}/{url}"  # self.base_url is CHATWOOT_BASE_URL
+                logger.info(f"Full URL constructed: {url}")
+    
             # Validate that URL is accessible
             if not url.startswith("http"):
-                logger.warning(f"⚠️ Invalid URL format: {url}")
+                logger.warning(f"Invalid URL format: {url}")
                 return None
-
+    
             return {
                 "type": attachment_type,
                 "url": url,
@@ -218,9 +218,9 @@ class ChatwootService:
                 "height": attachment.get("height"),
                 "original_data": attachment
             }
-
+    
         except Exception as e:
-            logger.error(f"❌ Error processing Chatwoot attachment: {e}")
+            logger.error(f"Error processing Chatwoot attachment: {e}")
             return None
 
     def debug_webhook_data(self, data: Dict[str, Any]):
