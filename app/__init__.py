@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from app.config import Config
 from app.utils.error_handlers import register_error_handlers
 from app.services.redis_service import init_redis
@@ -76,6 +76,14 @@ def create_app(config_class=Config):
     @app.route('/')
     def index():
         return {"status": "healthy", "message": "Benova Backend API is running"}
+
+    @app.route('/')
+    def serve_frontend():
+        return send_from_directory('.', 'index.html')
+    
+    @app.route('/<path:filename>')
+    def serve_static(filename):
+        return send_from_directory('.', filename)
     
     # ENHANCED: Inicializar sistemas de protección después de crear la app
     with app.app_context():
