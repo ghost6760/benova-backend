@@ -4,6 +4,7 @@ from app.utils.error_handlers import register_error_handlers
 from app.services.redis_service import init_redis
 from app.services.vectorstore_service import init_vectorstore
 from app.services.openai_service import init_openai
+from app.routes import webhook, documents, conversations, health, multimedia, admin
 import logging
 import sys
 
@@ -45,7 +46,7 @@ def create_app(config_class=Config):
     app.register_blueprint(documents.bp, url_prefix='/documents')
     app.register_blueprint(conversations.bp, url_prefix='/conversations')
     app.register_blueprint(health.bp, url_prefix='/health')
-    app.register_blueprint(multimedia.bp, url_prefix='/media')
+    app.register_blueprint(multimedia.bp, url_prefix='/multimedia')
     app.register_blueprint(admin.bp, url_prefix='/admin')
     
     # Registrar error handlers
