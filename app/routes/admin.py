@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from app.services.vectorstore_service import VectorstoreService
 from app.services.redis_service import get_redis_client
 from app.services.multiagent_system import MultiAgentSystem
 from app.utils.decorators import handle_errors, require_api_key
 from app.utils.helpers import create_success_response, create_error_response
 import logging
+import time  # Missing import
 
 logger = logging.getLogger(__name__)
 
