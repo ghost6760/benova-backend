@@ -133,7 +133,11 @@ class OpenAIService:
         finally:
             # Cleanup temp file
             if temp_path and os.path.exists(temp_path):
-                os.unlink(temp_path)
+                try:
+                    os.unlink(temp_path)
+                except Exception as cleanup_error:
+                    logger.warning(f"Could not cleanup temp file: {cleanup_error}")
+                
     
     def analyze_image(self, image_file) -> str:
         """Analyze image using OpenAI Vision API"""
