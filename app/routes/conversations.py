@@ -3,6 +3,7 @@ from app.models.conversation import ConversationManager
 from app.utils.decorators import handle_errors
 from app.utils.helpers import create_success_response, create_error_response
 import logging
+import time  # Missing import
 
 logger = logging.getLogger(__name__)
 
