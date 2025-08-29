@@ -67,7 +67,10 @@ class ChatwootService:
         if is_active:
             logger.info(f"✅ Bot WILL respond to conversation {conversation_id} (status: {conversation_status})")
         else:
-            logger.info(f"🚫 Bot will NOT respond to conversation {conversation_id} (status: {conversation_status})")
+            if conversation_status == "pending":
+                logger.info(f"⏸️ Bot will NOT respond to conversation {conversation_id} (status: pending - INACTIVE)")
+            else:
+                logger.info(f"🚫 Bot will NOT respond to conversation {conversation_id} (status: {conversation_status})")
 
         return is_active
 
@@ -115,9 +118,10 @@ class ChatwootService:
             return False
 
     def extract_contact_id(self, data: Dict[str, Any]) -> Tuple[Optional[str], str, bool]:
-        """Extract contact_id from webhook data"""
+        """Extract contact_id with unified priority system and validation"""
         conversation_data = data.get("conversation", {})
 
+        # Priority order for contact extraction
         extraction_methods = [
             ("conversation.contact_inbox.contact_id",
              lambda: conversation_data.get("contact_inbox", {}).get("contact_id")),
@@ -131,6 +135,7 @@ class ChatwootService:
             try:
                 contact_id = extractor()
                 if contact_id and str(contact_id).strip():
+                    # Validate contact_id format
                     contact_id = str(contact_id).strip()
                     if contact_id.isdigit() or contact_id.startswith("contact_"):
                         logger.info(f"✅ Contact ID extracted: {contact_id} (method: {method_name})")
@@ -164,31 +169,46 @@ class ChatwootService:
             return False
 
     def process_attachment(self, attachment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Process Chatwoot attachment"""
+        """Process Chatwoot attachment with complete parity to monolith"""
         try:
             logger.info(f"🔍 Processing Chatwoot attachment: {attachment}")
 
+            # Extract type with multiple methods (EXACTLY like monolith)
             attachment_type = None
 
-            # Extract type
+            # Method 1: file_type (most common in Chatwoot)
             if attachment.get("file_type"):
                 attachment_type = attachment["file_type"].lower()
+                logger.info(f"📝 Type from 'file_type': {attachment_type}")
+
+            # Method 2: extension (MISSING in original modular - NOW ADDED)
             elif attachment.get("extension"):
                 ext = attachment["extension"].lower().lstrip('.')
                 if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
                     attachment_type = "image"
                 elif ext in ['mp3', 'wav', 'ogg', 'm4a', 'aac']:
                     attachment_type = "audio"
+                logger.info(f"📝 Type inferred from extension '{ext}': {attachment_type}")
 
-            # Extract URL
+            # Extract URL with correct priority (EXACTLY like monolith)
             url = attachment.get("data_url") or attachment.get("url") or attachment.get("thumb_url")
 
             if not url:
                 logger.warning(f"⚠️ No URL found in attachment")
                 return None
 
+            # FIXED: Construct full URL if necessary (MISSING in original modular)
             if not url.startswith("http"):
-                url = f"{self.base_url}/{url.lstrip('/')}"
+                # Remove initial slash to avoid double slash
+                if url.startswith("/"):
+                    url = url[1:]
+                url = f"{self.base_url}/{url}"
+                logger.info(f"🔗 Full URL constructed: {url}")
+
+            # Validate that URL is accessible
+            if not url.startswith("http"):
+                logger.warning(f"⚠️ Invalid URL format: {url}")
+                return None
 
             return {
                 "type": attachment_type,
@@ -203,10 +223,33 @@ class ChatwootService:
             logger.error(f"❌ Error processing Chatwoot attachment: {e}")
             return None
 
+    def debug_webhook_data(self, data: Dict[str, Any]):
+        """Complete debugging function exactly like monolith"""
+        logger.info("🔍 === WEBHOOK DEBUG INFO ===")
+        logger.info(f"Event: {data.get('event')}")
+        logger.info(f"Message ID: {data.get('id')}")
+        logger.info(f"Message Type: {data.get('message_type')}")
+        logger.info(f"Content: '{data.get('content')}'")
+        logger.info(f"Content Length: {len(data.get('content', ''))}")
+
+        attachments = data.get('attachments', [])
+        logger.info(f"Attachments Count: {len(attachments)}")
+
+        for i, att in enumerate(attachments):
+            logger.info(f"  Attachment {i}:")
+            logger.info(f"    Keys: {list(att.keys())}")
+            logger.info(f"    Type: {att.get('type')}")
+            logger.info(f"    File Type: {att.get('file_type')}")
+            logger.info(f"    URL: {att.get('url')}")
+            logger.info(f"    Data URL: {att.get('data_url')}")
+            logger.info(f"    Thumb URL: {att.get('thumb_url')}")
+
+        logger.info("🔍 === END DEBUG INFO ===")
+
     def process_incoming_message(self, data: Dict[str, Any],
                                  conversation_manager: ConversationManager,
                                  multiagent: MultiAgentSystem) -> Dict[str, Any]:
-        """Process incoming message from webhook"""
+        """Process incoming message with comprehensive validation and error handling"""
         try:
             # Validate message type
             message_type = data.get("message_type")
@@ -214,7 +257,7 @@ class ChatwootService:
                 logger.info(f"🤖 Ignoring message type: {message_type}")
                 return {"status": "non_incoming_message", "ignored": True}
 
-            # Extract conversation data
+            # Extract and validate conversation data
             conversation_data = data.get("conversation", {})
             if not conversation_data:
                 raise ValueError("Missing conversation data")
@@ -237,61 +280,164 @@ class ChatwootService:
                     "active_only_for": self.bot_active_statuses
                 }
 
-            # Extract message content and ID
+            # Extract and validate message content
             content = data.get("content", "").strip()
             message_id = data.get("id")
 
-            # Process attachments
+            # MEJORADO: Extraer attachments con debugging
             attachments = data.get("attachments", [])
-            media_context = None
-            media_type = "text"
-            processed_attachment = None
-
-            if attachments:
-                openai_service = OpenAIService()
-                for attachment in attachments:
-                    processed = self.process_attachment(attachment)
-                    if processed and processed["type"] in ["image", "audio"]:
-                        media_type = processed["type"]
-                        processed_attachment = processed
-
-                        try:
-                            if media_type == "audio":
-                                media_context = openai_service.transcribe_audio_from_url(processed["url"])
-                            elif media_type == "image":
-                                media_context = openai_service.analyze_image_from_url(processed["url"])
-                            break
-                        except Exception as e:
-                            logger.error(f"Error processing {media_type}: {e}")
-                            media_context = f"[{media_type.title()} file - processing failed]"
+            logger.info(f"📎 Attachments received: {len(attachments)}")
+            for i, att in enumerate(attachments):
+                logger.info(f"📎 Attachment {i}: {att}")
 
             # Check for duplicate processing
             if message_id and self.is_message_already_processed(message_id, conversation_id):
                 return {"status": "already_processed", "ignored": True}
 
-            # Extract contact information
+            # Extract contact information with improved validation
             contact_id, extraction_method, is_valid = self.extract_contact_id(data)
             if not is_valid or not contact_id:
-                raise ValueError("Could not extract valid contact_id")
+                raise ValueError("Could not extract valid contact_id from webhook data")
 
-            # Generate user_id
+            # Generate standardized user_id
             user_id = conversation_manager._create_user_id(contact_id)
 
             logger.info(f"🔄 Processing message from conversation {conversation_id}")
-            logger.info(f"👤 User: {user_id} (contact: {contact_id})")
+            logger.info(f"👤 User: {user_id} (contact: {contact_id}, method: {extraction_method})")
+            logger.info(f"💬 Message: {content[:100]}...")
 
-            # Handle empty content with media context
-            if not content and media_context:
-                content = media_context
+            # CORREGIDO: Procesar archivos adjuntos multimedia
+            media_context = None
+            media_type = "text"
+            processed_attachment = None
 
-            if not content:
+            for attachment in attachments:
+                try:
+                    logger.info(f"🔍 Processing attachment: {attachment}")
+
+                    # MEJORADO: Múltiples formas de obtener el tipo
+                    attachment_type = None
+
+                    # Método 1: Campo 'type' directo
+                    if attachment.get("type"):
+                        attachment_type = attachment["type"].lower()
+                        logger.info(f"📝 Type from 'type' field: {attachment_type}")
+
+                    # Método 2: Campo 'file_type' (Chatwoot a veces usa esto)
+                    elif attachment.get("file_type"):
+                        attachment_type = attachment["file_type"].lower()
+                        logger.info(f"📝 Type from 'file_type' field: {attachment_type}")
+
+                    # MEJORADO: Múltiples formas de obtener la URL
+                    url = None
+
+                    # Método 1: Campo 'data_url' (común en Chatwoot)
+                    if attachment.get("data_url"):
+                        url = attachment["data_url"]
+                        logger.info(f"🔗 URL from 'data_url': {url}")
+
+                    # Método 2: Campo 'url'
+                    elif attachment.get("url"):
+                        url = attachment["url"]
+                        logger.info(f"🔗 URL from 'url': {url}")
+
+                    # Método 3: Campo 'thumb_url' como fallback
+                    elif attachment.get("thumb_url"):
+                        url = attachment["thumb_url"]
+                        logger.info(f"🔗 URL from 'thumb_url': {url}")
+
+                    if not url:
+                        logger.warning(f"⚠️ No URL found in attachment: {attachment}")
+                        continue
+
+                    # MEJORADO: Construir URL completa si es necesaria
+                    if url and not url.startswith("http"):
+                        # Remover slash inicial si existe para evitar doble slash
+                        if url.startswith("/"):
+                            url = url[1:]
+                        url = f"{self.base_url}/{url}"
+                        logger.info(f"🔗 Full URL constructed: {url}")
+
+                    # MEJORADO: Inferir tipo desde URL si no está disponible
+                    if not attachment_type and url:
+                        url_lower = url.lower()
+                        if any(url_lower.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+                            attachment_type = "image"
+                            logger.info(f"📝 Type inferred from URL: {attachment_type}")
+                        elif any(url_lower.endswith(ext) for ext in ['.mp3', '.wav', '.m4a', '.ogg']):
+                            attachment_type = "audio"
+                            logger.info(f"📝 Type inferred from URL: {attachment_type}")
+                        elif "image" in url_lower:
+                            attachment_type = "image"
+                            logger.info(f"📝 Type inferred from URL path: {attachment_type}")
+
+                    # Procesar según el tipo
+                    if attachment_type in ["image", "audio"]:
+                        media_type = attachment_type
+                        processed_attachment = {
+                            "type": attachment_type,
+                            "url": url,
+                            "original_data": attachment
+                        }
+
+                        logger.info(f"🎯 Processing {media_type}: {url}")
+
+                        if media_type == "audio":
+                            try:
+                                logger.info(f"🎵 Transcribing audio: {url}")
+                                openai_service = OpenAIService()
+                                media_context = openai_service.transcribe_audio_from_url(url)
+                                logger.info(f"🎵 Audio transcribed: {media_context[:100]}...")
+                            except Exception as audio_error:
+                                logger.error(f"❌ Audio transcription failed: {audio_error}")
+                                media_context = f"[Audio file - transcription failed: {str(audio_error)}]"
+
+                        elif media_type == "image":
+                            try:
+                                logger.info(f"🖼️ Analyzing image: {url}")
+                                openai_service = OpenAIService()
+                                media_context = openai_service.analyze_image_from_url(url)
+                                logger.info(f"🖼️ Image analyzed: {media_context[:100]}...")
+                            except Exception as image_error:
+                                logger.error(f"❌ Image analysis failed: {image_error}")
+                                media_context = f"[Image file - analysis failed: {str(image_error)}]"
+
+                        break  # Procesar solo el primer adjunto válido
+                    else:
+                        logger.info(f"⏭️ Skipping attachment type: {attachment_type}")
+
+                except Exception as e:
+                    logger.error(f"❌ Error processing attachment {attachment}: {e}")
+                    continue
+
+            # MEJORADO: Validar que hay contenido procesable
+            if not content and not media_context:
+                logger.error("Empty or invalid message content and no media context")
+                # Proporcionar información de debugging
+                debug_info = {
+                    "attachments_count": len(attachments),
+                    "attachments_sample": attachments[:2] if attachments else [],
+                    "content_length": len(content),
+                    "media_type": media_type,
+                    "processed_attachment": processed_attachment
+                }
+                logger.error(f"Debug info: {debug_info}")
+
                 return {
                     "status": "success",
                     "message": "Empty message handled",
+                    "conversation_id": str(conversation_id),
+                    "debug_info": debug_info,
                     "assistant_reply": "Por favor, envía un mensaje con contenido para poder ayudarte. 😊"
                 }
 
-            # Get response from multi-agent system
+            # Si solo hay contenido multimedia sin texto, usar el análisis como mensaje
+            if not content and media_context:
+                content = media_context  # Usar la transcripción directamente
+                logger.info(f"📝 Using media context as primary content: {media_context[:100]}...")
+
+            # Generar respuesta con contexto multimedia
+            logger.info(f"🤖 Generating response with media_type: {media_type}")
             assistant_reply, agent_used = multiagent.get_response(
                 question=content,
                 user_id=user_id,
@@ -299,6 +445,11 @@ class ChatwootService:
                 media_type=media_type,
                 media_context=media_context
             )
+
+            if not assistant_reply or not assistant_reply.strip():
+                assistant_reply = "Disculpa, no pude procesar tu mensaje. ¿Podrías intentar de nuevo? 😊"
+
+            logger.info(f"🤖 Assistant response: {assistant_reply[:100]}...")
 
             # Send response to Chatwoot
             success = self.send_message(conversation_id, assistant_reply)
@@ -314,34 +465,18 @@ class ChatwootService:
                 "conversation_id": str(conversation_id),
                 "user_id": user_id,
                 "contact_id": contact_id,
+                "contact_extraction_method": extraction_method,
+                "conversation_status": conversation_status,
+                "message_id": message_id,
+                "bot_active": True,
                 "agent_used": agent_used,
-                "media_processed": media_type if media_context else None
+                "message_length": len(content),
+                "response_length": len(assistant_reply),
+                "media_processed": media_type if media_context else None,
+                "media_context_length": len(media_context) if media_context else 0,
+                "processed_attachment": processed_attachment
             }
 
         except Exception as e:
-            logger.exception(f"Error processing incoming message")
+            logger.exception(f"💥 Error procesando mensaje (ID: {message_id})")
             raise
-
-
-    def debug_webhook_data(self, data: Dict[str, Any]):
-        """Función para debugging completo del webhook de Chatwoot"""
-        logger.info("🔍 === WEBHOOK DEBUG INFO ===")
-        logger.info(f"Event: {data.get('event')}")
-        logger.info(f"Message ID: {data.get('id')}")
-        logger.info(f"Message Type: {data.get('message_type')}")
-        logger.info(f"Content: '{data.get('content')}'")
-        logger.info(f"Content Length: {len(data.get('content', ''))}")
-        
-        attachments = data.get('attachments', [])
-        logger.info(f"Attachments Count: {len(attachments)}")
-        
-        for i, att in enumerate(attachments):
-            logger.info(f"  Attachment {i}:")
-            logger.info(f"    Keys: {list(att.keys())}")
-            logger.info(f"    Type: {att.get('type')}")
-            logger.info(f"    File Type: {att.get('file_type')}")
-            logger.info(f"    URL: {att.get('url')}")
-            logger.info(f"    Data URL: {att.get('data_url')}")
-            logger.info(f"    Thumb URL: {att.get('thumb_url')}")
-        
-        logger.info("🔍 === END DEBUG INFO ===")
