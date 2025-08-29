@@ -42,6 +42,8 @@ class Config:
     SCHEDULE_SERVICE_URL = os.getenv('SCHEDULE_SERVICE_URL', 'http://127.0.0.1:4040')
     ENVIRONMENT = os.getenv('ENVIRONMENT', 'production')
 
+    API_KEY = os.getenv('API_KEY')  # Para endpoints de admin
+
 class DevelopmentConfig(Config):
     DEBUG = True
     LOG_LEVEL = 'DEBUG'
