@@ -1068,6 +1068,15 @@ Para información específica, te conectaré con un especialista."""
             return "support"
         else:
             return "support"
+
+    def search_documents(self, query: str, k: int = 3):
+        """Search documents using vectorstore - compatibility method"""
+        try:
+            docs = self.retriever.invoke(query)
+            return docs
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            return []
     
     def _log_schedule_decision_process(self, question: str, availability: str, will_use_selenium: bool):
         """Log detallado del proceso de decisión para agendamiento"""
