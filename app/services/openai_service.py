@@ -34,7 +34,7 @@ class OpenAIService:
     
     def __init__(self):
         self.api_key = current_app.config['OPENAI_API_KEY']
-        self.model_name = current_app.config.get('MODEL_NAME', 'gpt-4o-mini')
+        self.model_name = current_app.config.get('MODEL_NAME', 'gpt-4.1-mini-2025-04-14')
         self.embedding_model = current_app.config.get('EMBEDDING_MODEL', 'text-embedding-3-small')
         self.max_tokens = current_app.config.get('MAX_TOKENS', 1500)
         self.temperature = current_app.config.get('TEMPERATURE', 0.7)
@@ -172,7 +172,7 @@ class OpenAIService:
             base64_image = base64.b64encode(image_data).decode('utf-8')
             
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4.1-mini-2025-04-14",
                 messages=[
                     {
                         "role": "user",
