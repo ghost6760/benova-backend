@@ -224,6 +224,17 @@ class ConversationManager:
         except Exception as e:
             logger.error(f"Error clearing conversation for {user_id}: {e}")
             return False
+
+
+    def get_last_updated(self, user_id: str) -> Optional[str]:
+        """Get last updated timestamp for a conversation"""
+        try:
+            conversation_key = self._get_conversation_key(user_id)
+            metadata = self.redis_client.hgetall(conversation_key)
+            return metadata.get('last_updated')
+        except Exception as e:
+            logger.error(f"Error getting last updated for {user_id}: {e}")
+            return None
     
     def get_conversation_stats(self) -> Dict[str, Any]:
         """Get overall conversation statistics"""
