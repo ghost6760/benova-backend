@@ -7,12 +7,16 @@ import requests
 import logging
 import json
 import time
+import tempfile
+import os
+import base64
+from io import BytesIO
 from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 class ChatwootService:
-    """Service for handling Chatwoot interactions"""
+    """Service for handling Chatwoot interactions with integrated multimedia processing"""
 
     def __init__(self):
         self.api_key = current_app.config['CHATWOOT_API_KEY']
@@ -21,6 +25,9 @@ class ChatwootService:
         self.redis_client = get_redis_client()
         self.bot_active_statuses = ["open"]
         self.bot_inactive_statuses = ["pending", "resolved", "snoozed"]
+        
+        # Initialize OpenAI service for multimedia processing
+        self.openai_service = OpenAIService()
 
     def send_message(self, conversation_id: int, message_content: str) -> bool:
         """Send message to Chatwoot conversation"""
@@ -168,6 +175,89 @@ class ChatwootService:
             logger.error(f"Error handling conversation_updated: {e}")
             return False
 
+    # INTEGRATED MULTIMEDIA PROCESSING METHODS
+    
+    def transcribe_audio_from_url(self, audio_url: str) -> str:
+        """Transcribe audio from URL with robust error handling (EXACTLY like monolith)"""
+        try:
+            logger.info(f"🔽 Downloading audio from: {audio_url}")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; ChatbotAudioTranscriber/1.0)',
+                'Accept': 'audio/*,*/*;q=0.9'
+            }
+            
+            response = requests.get(audio_url, headers=headers, timeout=60, stream=True)
+            response.raise_for_status()
+            
+            # Verify content-type if available
+            content_type = response.headers.get('content-type', '').lower()
+            logger.info(f"📄 Audio content-type: {content_type}")
+            
+            # Determine extension based on content-type or URL
+            extension = '.ogg'  # Default for Chatwoot
+            if 'mp3' in content_type or audio_url.endswith('.mp3'):
+                extension = '.mp3'
+            elif 'wav' in content_type or audio_url.endswith('.wav'):
+                extension = '.wav'
+            elif 'm4a' in content_type or audio_url.endswith('.m4a'):
+                extension = '.m4a'
+            
+            # Create temporary file with correct extension
+            with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    temp_file.write(chunk)
+                temp_path = temp_file.name
+            
+            logger.info(f"📁 Audio saved to temp file: {temp_path} (size: {os.path.getsize(temp_path)} bytes)")
+            
+            try:
+                result = self.openai_service.transcribe_audio(temp_path)
+                logger.info(f"🎵 Transcription successful: {len(result)} characters")
+                return result
+                
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_path)
+                    logger.info(f"🗑️ Temporary file deleted: {temp_path}")
+                except Exception as cleanup_error:
+                    logger.warning(f"⚠️ Could not delete temp file {temp_path}: {cleanup_error}")
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error downloading audio: {e}")
+            raise Exception(f"Error downloading audio: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error in audio transcription from URL: {e}")
+            raise
+
+    def analyze_image_from_url(self, image_url: str) -> str:
+        """Analyze image from URL using GPT-4 Vision (EXACTLY like monolith)"""
+        try:
+            logger.info(f"🔽 Downloading image from: {image_url}")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; ChatbotImageAnalyzer/1.0)'
+            }
+            response = requests.get(image_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            # Verify it's an image
+            content_type = response.headers.get('content-type', '').lower()
+            if not any(img_type in content_type for img_type in ['image/', 'jpeg', 'png', 'gif', 'webp']):
+                logger.warning(f"⚠️ Content type might not be image: {content_type}")
+            
+            # Create file in memory
+            image_file = BytesIO(response.content)
+            
+            # Analyze using OpenAI service
+            return self.openai_service.analyze_image(image_file)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error downloading image: {e}")
+            raise Exception(f"Error downloading image: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Error in image analysis from URL: {e}")
+            raise
+
     def process_attachment(self, attachment: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process Chatwoot attachment with complete parity to monolith"""
         try:
@@ -306,7 +396,7 @@ class ChatwootService:
             logger.info(f"👤 User: {user_id} (contact: {contact_id}, method: {extraction_method})")
             logger.info(f"💬 Message: {content[:100]}...")
 
-            # CORREGIDO: Procesar archivos adjuntos multimedia
+            # ENHANCED: Process multimedia attachments using integrated methods
             media_context = None
             media_type = "text"
             processed_attachment = None
@@ -314,79 +404,27 @@ class ChatwootService:
             for attachment in attachments:
                 try:
                     logger.info(f"🔍 Processing attachment: {attachment}")
-
-                    # MEJORADO: Múltiples formas de obtener el tipo
-                    attachment_type = None
-
-                    # Método 1: Campo 'type' directo
-                    if attachment.get("type"):
-                        attachment_type = attachment["type"].lower()
-                        logger.info(f"📝 Type from 'type' field: {attachment_type}")
-
-                    # Método 2: Campo 'file_type' (Chatwoot a veces usa esto)
-                    elif attachment.get("file_type"):
-                        attachment_type = attachment["file_type"].lower()
-                        logger.info(f"📝 Type from 'file_type' field: {attachment_type}")
-
-                    # MEJORADO: Múltiples formas de obtener la URL
-                    url = None
-
-                    # Método 1: Campo 'data_url' (común en Chatwoot)
-                    if attachment.get("data_url"):
-                        url = attachment["data_url"]
-                        logger.info(f"🔗 URL from 'data_url': {url}")
-
-                    # Método 2: Campo 'url'
-                    elif attachment.get("url"):
-                        url = attachment["url"]
-                        logger.info(f"🔗 URL from 'url': {url}")
-
-                    # Método 3: Campo 'thumb_url' como fallback
-                    elif attachment.get("thumb_url"):
-                        url = attachment["thumb_url"]
-                        logger.info(f"🔗 URL from 'thumb_url': {url}")
-
-                    if not url:
-                        logger.warning(f"⚠️ No URL found in attachment: {attachment}")
+                    processed_attachment = self.process_attachment(attachment)
+                    
+                    if not processed_attachment:
+                        continue
+                    
+                    attachment_type = processed_attachment.get("type")
+                    url = processed_attachment.get("url")
+                    
+                    if not attachment_type or not url:
                         continue
 
-                    # MEJORADO: Construir URL completa si es necesaria
-                    if url and not url.startswith("http"):
-                        # Remover slash inicial si existe para evitar doble slash
-                        if url.startswith("/"):
-                            url = url[1:]
-                        url = f"{self.base_url}/{url}"
-                        logger.info(f"🔗 Full URL constructed: {url}")
-
-                    # MEJORADO: Inferir tipo desde URL si no está disponible
-                    if not attachment_type and url:
-                        url_lower = url.lower()
-                        if any(url_lower.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
-                            attachment_type = "image"
-                            logger.info(f"📝 Type inferred from URL: {attachment_type}")
-                        elif any(url_lower.endswith(ext) for ext in ['.mp3', '.wav', '.m4a', '.ogg']):
-                            attachment_type = "audio"
-                            logger.info(f"📝 Type inferred from URL: {attachment_type}")
-                        elif "image" in url_lower:
-                            attachment_type = "image"
-                            logger.info(f"📝 Type inferred from URL path: {attachment_type}")
-
-                    # Procesar según el tipo
+                    # Process according to type using integrated methods
                     if attachment_type in ["image", "audio"]:
                         media_type = attachment_type
-                        processed_attachment = {
-                            "type": attachment_type,
-                            "url": url,
-                            "original_data": attachment
-                        }
-
+                        
                         logger.info(f"🎯 Processing {media_type}: {url}")
 
                         if media_type == "audio":
                             try:
                                 logger.info(f"🎵 Transcribing audio: {url}")
-                                openai_service = OpenAIService()
-                                media_context = openai_service.transcribe_audio_from_url(url)
+                                media_context = self.transcribe_audio_from_url(url)
                                 logger.info(f"🎵 Audio transcribed: {media_context[:100]}...")
                             except Exception as audio_error:
                                 logger.error(f"❌ Audio transcription failed: {audio_error}")
@@ -395,14 +433,13 @@ class ChatwootService:
                         elif media_type == "image":
                             try:
                                 logger.info(f"🖼️ Analyzing image: {url}")
-                                openai_service = OpenAIService()
-                                media_context = openai_service.analyze_image_from_url(url)
+                                media_context = self.analyze_image_from_url(url)
                                 logger.info(f"🖼️ Image analyzed: {media_context[:100]}...")
                             except Exception as image_error:
                                 logger.error(f"❌ Image analysis failed: {image_error}")
                                 media_context = f"[Image file - analysis failed: {str(image_error)}]"
 
-                        break  # Procesar solo el primer adjunto válido
+                        break  # Process only the first valid attachment
                     else:
                         logger.info(f"⏭️ Skipping attachment type: {attachment_type}")
 
@@ -410,10 +447,9 @@ class ChatwootService:
                     logger.error(f"❌ Error processing attachment {attachment}: {e}")
                     continue
 
-            # MEJORADO: Validar que hay contenido procesable
+            # ENHANCED: Validate processable content
             if not content and not media_context:
                 logger.error("Empty or invalid message content and no media context")
-                # Proporcionar información de debugging
                 debug_info = {
                     "attachments_count": len(attachments),
                     "attachments_sample": attachments[:2] if attachments else [],
@@ -431,12 +467,12 @@ class ChatwootService:
                     "assistant_reply": "Por favor, envía un mensaje con contenido para poder ayudarte. 😊"
                 }
 
-            # Si solo hay contenido multimedia sin texto, usar el análisis como mensaje
+            # If only multimedia content without text, use analysis as message
             if not content and media_context:
-                content = media_context  # Usar la transcripción directamente
+                content = media_context
                 logger.info(f"📝 Using media context as primary content: {media_context[:100]}...")
 
-            # Generar respuesta con contexto multimedia
+            # Generate response with multimedia context
             logger.info(f"🤖 Generating response with media_type: {media_type}")
             assistant_reply, agent_used = multiagent.get_response(
                 question=content,
@@ -478,5 +514,5 @@ class ChatwootService:
             }
 
         except Exception as e:
-            logger.exception(f"💥 Error procesando mensaje (ID: {message_id})")
+            logger.exception(f"💥 Error procesando mensaje (ID: {data.get('id', 'unknown')})")
             raise
