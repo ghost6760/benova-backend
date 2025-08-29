@@ -1,9 +1,9 @@
-from flask import Flask
+from flask import Flask, request
 from app.config import Config
 from app.utils.error_handlers import register_error_handlers
 from app.services.redis_service import init_redis
 from app.services.vectorstore_service import init_vectorstore
-from app.services.openai_service import init_openai  # This import was missing
+from app.services.openai_service import init_openai
 import logging
 import sys
 
@@ -25,6 +25,19 @@ def create_app(config_class=Config):
         init_openai(app)
         init_vectorstore(app)
     
+    # MOVER EL MIDDLEWARE DENTRO DE create_app()
+    @app.before_request
+    def ensure_vectorstore_health():
+        """Middleware que verifica salud del vectorstore"""
+        vector_endpoints = ['/webhook/chatwoot', '/documents', '/chat']
+        
+        if any(endpoint in request.path for endpoint in vector_endpoints):
+            try:
+                # Verificación no-bloqueante del estado del índice
+                pass  # Implementar según tu lógica de recuperación
+            except Exception as e:
+                app.logger.error(f"Error in health check middleware: {e}")
+    
     # Registrar blueprints
     from app.routes import webhook, documents, conversations, health, multimedia, admin
     
@@ -45,46 +58,38 @@ def create_app(config_class=Config):
     
     return app
 
-
-def initialize_protection_system():
+def initialize_protection_system(app):
     """Inicializar protección después de crear la app"""
     try:
-        # Debe ejecutarse después de que modern_rag_system esté disponible
-        from app.services.vectorstore_service import apply_vectorstore_protection
-        apply_vectorstore_protection()
-        logger.info("✅ Vectorstore protection applied")
+        with app.app_context():
+            from app.services.vectorstore_service import apply_vectorstore_protection
+            apply_vectorstore_protection()
+            app.logger.info("Vectorstore protection applied")
     except Exception as e:
-        logger.warning(f"Could not apply vectorstore protection: {e}")
+        app.logger.warning(f"Could not apply vectorstore protection: {e}")
 
-def startup_checks():
+def startup_checks(app):
     """Verificaciones completas de inicio"""
     try:
-        # Validar Redis
-        redis_client.ping()
-        
-        # Validar OpenAI
-        openai_service = OpenAIService()
-        if not openai_service.validate_openai_setup():
-            raise Exception("OpenAI validation failed")
-        
-        # Validar Vectorstore
-        vectorstore_service = VectorstoreService()
-        vectorstore_service.test_connection()
-        
-        logger.info("All startup checks passed")
-        return True
+        with app.app_context():
+            from app.services.redis_service import get_redis_client
+            from app.services.openai_service import OpenAIService
+            from app.services.vectorstore_service import VectorstoreService
+            
+            # Validar Redis
+            redis_client = get_redis_client()
+            redis_client.ping()
+            
+            # Validar OpenAI
+            openai_service = OpenAIService()
+            openai_service.test_connection()
+            
+            # Validar Vectorstore
+            vectorstore_service = VectorstoreService()
+            vectorstore_service.test_connection()
+            
+            app.logger.info("All startup checks passed")
+            return True
     except Exception as e:
-        logger.error(f"Startup check failed: {e}")
+        app.logger.error(f"Startup check failed: {e}")
         raise
-
-@app.before_request
-def ensure_vectorstore_health():
-    """Middleware que verifica salud del vectorstore"""
-    vector_endpoints = ['/webhook/chatwoot', '/documents', '/chat']
-    
-    if any(endpoint in request.path for endpoint in vector_endpoints):
-        try:
-            # Verificación no-bloqueante del estado del índice
-            pass  # Implementar según tu lógica de recuperación
-        except Exception as e:
-            logger.error(f"Error in health check middleware: {e}")
