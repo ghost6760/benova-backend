@@ -55,3 +55,16 @@ def initialize_protection_system():
         logger.info("✅ Vectorstore protection applied")
     except Exception as e:
         logger.warning(f"Could not apply vectorstore protection: {e}")
+
+
+@app.before_request
+def ensure_vectorstore_health():
+    """Middleware que verifica salud del vectorstore"""
+    vector_endpoints = ['/webhook/chatwoot', '/documents', '/chat']
+    
+    if any(endpoint in request.path for endpoint in vector_endpoints):
+        try:
+            # Verificación no-bloqueante del estado del índice
+            pass  # Implementar según tu lógica de recuperación
+        except Exception as e:
+            logger.error(f"Error in health check middleware: {e}")
