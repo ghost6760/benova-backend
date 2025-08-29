@@ -109,3 +109,51 @@ def process_image_message():
     except Exception as e:
         logger.error(f"Error processing image message: {e}")
         return create_error_response("Failed to process image message", 500)
+
+
+@bp.route('/test-multimedia', methods=['POST'])
+@handle_errors
+def test_multimedia_processing():
+    """Test multimedia processing without conversation context"""
+    try:
+        media_type = request.form.get('media_type', 'text')
+        
+        if media_type == 'voice' and 'audio' in request.files:
+            audio_file = request.files['audio']
+            
+            # Save temporarily
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
+                audio_file.save(temp_file.name)
+                temp_path = temp_file.name
+            
+            try:
+                openai_service = OpenAIService()
+                transcript = openai_service.transcribe_audio(temp_path)
+                
+                return create_success_response({
+                    "media_type": "voice",
+                    "transcript": transcript,
+                    "processing_success": True
+                })
+            finally:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+        
+        elif media_type == 'image' and 'image' in request.files:
+            image_file = request.files['image']
+            
+            openai_service = OpenAIService()
+            description = openai_service.analyze_image(image_file)
+            
+            return create_success_response({
+                "media_type": "image",
+                "description": description,
+                "processing_success": True
+            })
+        
+        else:
+            return create_error_response("Invalid media_type or missing file", 400)
+            
+    except Exception as e:
+        logger.error(f"Error in multimedia test: {e}")
+        return create_error_response("Multimedia test failed", 500)
