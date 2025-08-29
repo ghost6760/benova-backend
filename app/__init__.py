@@ -75,9 +75,11 @@ def create_app(config_class=Config):
     def serve_frontend():
         """Servir el frontend o respuesta API según disponibilidad"""
         try:
-            # Intentar servir index.html si existe
-            if os.path.exists('index.html'):
-                return send_file('index.html')
+            # Buscar en la raíz del proyecto (un nivel arriba de app/)
+            html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'index.html')
+            
+            if os.path.exists(html_path):
+                return send_file(html_path)
             else:
                 # Fallback a respuesta JSON si no hay frontend
                 return {"status": "healthy", "message": "Benova Backend API is running"}
@@ -93,15 +95,17 @@ def create_app(config_class=Config):
         
         if filename in allowed_files:
             try:
-                if os.path.exists(filename):
-                    return send_file(filename)
+                # Buscar en la raíz del proyecto
+                file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), filename)
+                
+                if os.path.exists(file_path):
+                    return send_file(file_path)
                 else:
                     return {"status": "error", "message": "File not found"}, 404
             except Exception as e:
                 logger.error(f"Error serving static file {filename}: {e}")
                 return {"status": "error", "message": "Error serving file"}, 500
         else:
-            # Para archivos no permitidos, retornar respuesta API
             return {"status": "error", "message": "File not allowed"}, 403
     
     # Registrar error handlers
