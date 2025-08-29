@@ -10,7 +10,6 @@
         <header>
             <h1>Panel de Control - Benova Bot</h1>
         </header>
-
         <!-- Sección de Documentos -->
         <section class="document-section">
             <h2>Gestión de Documentos</h2>
@@ -24,7 +23,6 @@
                     <button type="submit">Agregar</button>
                 </form>
             </div>
-
             <!-- Bulk Upload -->
             <div class="card">
                 <h3>Subir Múltiples Documentos</h3>
@@ -33,7 +31,6 @@
                     <button type="submit">Subir Archivos</button>
                 </form>
             </div>
-
             <!-- Lista de Documentos -->
             <div class="card">
                 <h3>Documentos Almacenados</h3>
@@ -42,7 +39,6 @@
                 <div id="documentsList" class="documents-grid"></div>
             </div>
         </section>
-
         <!-- Sección de Chat -->
         <section class="chat-section">
             <h2>Probar Chatbot</h2>
@@ -53,18 +49,50 @@
                 <input type="text" id="userMessage" placeholder="Escribe tu mensaje...">
                 <button type="submit">Enviar</button>
             </form>
-
-            <!-- Nuevos controles para multimedia -->
+            
+            <!-- Controles multimedia mejorados -->
             <div class="multimedia-controls">
+                <!-- Botones principales para grabación/captura -->
+                <button id="recordVoiceBtn" class="btn-multimedia">🎤 Grabar Voz</button>
+                <button id="captureImageBtn" class="btn-multimedia">📸 Tomar Foto</button>
+                
+                <!-- Separador visual -->
+                <span class="separator">|</span>
+                
+                <!-- Inputs para subir archivos (fallback) -->
                 <input type="file" id="voiceFile" accept="audio/*" hidden>
-                <label for="voiceFile" class="btn-secondary">🎤 Voz</label>
+                <label for="voiceFile" class="btn-secondary">📁 Subir Audio</label>
                 
                 <input type="file" id="imageFile" accept="image/*" hidden>
-                <label for="imageFile" class="btn-secondary">🖼️ Imagen</label>
+                <label for="imageFile" class="btn-secondary">🖼️ Subir Imagen</label>
+            </div>
+            
+            <!-- Estado de grabación -->
+            <div id="recordingStatus" class="recording-status" style="display: none;">
+                <span class="recording-indicator">🔴</span>
+                <span>Grabando audio...</span>
+                <button id="stopRecordingBtn" class="btn-stop">Parar</button>
+            </div>
+            
+            <!-- Modal para captura de imagen -->
+            <div id="cameraModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Capturar Imagen</h3>
+                        <button id="closeCameraBtn" class="btn-close">&times;</button>
+                    </div>
+                    <div class="camera-container">
+                        <video id="cameraVideo" autoplay></video>
+                        <canvas id="cameraCanvas" style="display: none;"></canvas>
+                    </div>
+                    <div class="camera-controls">
+                        <button id="takePictureBtn" class="btn-primary">📸 Tomar Foto</button>
+                        <button id="cancelCameraBtn" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
