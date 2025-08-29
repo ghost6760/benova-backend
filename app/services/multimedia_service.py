@@ -7,13 +7,17 @@ import base64
 from io import BytesIO
 from openai import OpenAI
 from typing import Optional
-from app.core.logging_config import logger
-from app.core.config import Config
+from flask import current_app
+import logging
+
+# FIXED: Remove app.core imports that don't exist in modular structure
+logger = logging.getLogger(__name__)
 
 
 class MultimediaService:
     def __init__(self):
-        self.client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        # FIXED: Use current_app.config instead of app.core.config
+        self.client = OpenAI(api_key=current_app.config['OPENAI_API_KEY'])
     
     def transcribe_audio(self, audio_path: str) -> str:
         """Transcribe audio to text using Whisper with Spanish language (EXACTLY like monolith)"""
@@ -36,7 +40,7 @@ class MultimediaService:
     def transcribe_audio_from_url(self, audio_url: str) -> str:
         """Transcribe audio from URL with improved error handling (EXACTLY like monolith)"""
         try:
-            logger.info(f"🔽 Downloading audio from: {audio_url}")
+            logger.info(f"Downloading audio from: {audio_url}")
             headers = {
                 'User-Agent': 'Mozilla/5.0 (compatible; ChatbotAudioTranscriber/1.0)',
                 'Accept': 'audio/*,*/*;q=0.9'
@@ -47,7 +51,7 @@ class MultimediaService:
             
             # Verify content-type if available
             content_type = response.headers.get('content-type', '').lower()
-            logger.info(f"📄 Audio content-type: {content_type}")
+            logger.info(f"Audio content-type: {content_type}")
             
             # Determine extension based on content-type or URL
             extension = '.ogg'  # Default for Chatwoot
@@ -64,26 +68,26 @@ class MultimediaService:
                     temp_file.write(chunk)
                 temp_path = temp_file.name
             
-            logger.info(f"📁 Audio saved to temp file: {temp_path} (size: {os.path.getsize(temp_path)} bytes)")
+            logger.info(f"Audio saved to temp file: {temp_path} (size: {os.path.getsize(temp_path)} bytes)")
             
             try:
                 result = self.transcribe_audio(temp_path)
-                logger.info(f"🎵 Transcription successful: {len(result)} characters")
+                logger.info(f"Transcription successful: {len(result)} characters")
                 return result
                 
             finally:
                 # Clean up temporary file
                 try:
                     os.unlink(temp_path)
-                    logger.info(f"🗑️ Temporary file deleted: {temp_path}")
+                    logger.info(f"Temporary file deleted: {temp_path}")
                 except Exception as cleanup_error:
-                    logger.warning(f"⚠️ Could not delete temp file {temp_path}: {cleanup_error}")
+                    logger.warning(f"Could not delete temp file {temp_path}: {cleanup_error}")
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"❌ Error downloading audio: {e}")
+            logger.error(f"Error downloading audio: {e}")
             raise Exception(f"Error downloading audio: {str(e)}")
         except Exception as e:
-            logger.error(f"❌ Error in audio transcription from URL: {e}")
+            logger.error(f"Error in audio transcription from URL: {e}")
             raise
 
     def analyze_image(self, image_file) -> str:
@@ -126,7 +130,7 @@ class MultimediaService:
     def analyze_image_from_url(self, image_url: str) -> str:
         """Analyze image from URL using GPT-4 Vision (EXACTLY like monolith)"""
         try:
-            logger.info(f"🔽 Downloading image from: {image_url}")
+            logger.info(f"Downloading image from: {image_url}")
             headers = {
                 'User-Agent': 'Mozilla/5.0 (compatible; ChatbotImageAnalyzer/1.0)'
             }
@@ -136,7 +140,7 @@ class MultimediaService:
             # Verify it's an image
             content_type = response.headers.get('content-type', '').lower()
             if not any(img_type in content_type for img_type in ['image/', 'jpeg', 'png', 'gif', 'webp']):
-                logger.warning(f"⚠️ Content type might not be image: {content_type}")
+                logger.warning(f"Content type might not be image: {content_type}")
             
             # Create file in memory
             image_file = BytesIO(response.content)
@@ -145,10 +149,10 @@ class MultimediaService:
             return self.analyze_image(image_file)
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"❌ Error downloading image: {e}")
+            logger.error(f"Error downloading image: {e}")
             raise Exception(f"Error downloading image: {str(e)}")
         except Exception as e:
-            logger.error(f"❌ Error in image analysis from URL: {e}")
+            logger.error(f"Error in image analysis from URL: {e}")
             raise
 
     def text_to_speech(self, text: str) -> str:
