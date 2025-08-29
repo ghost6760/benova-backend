@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, current_app
 from app.services.redis_service import get_redis_client
 from app.services.vectorstore_service import VectorstoreService
 from app.services.openai_service import OpenAIService
