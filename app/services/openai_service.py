@@ -237,6 +237,44 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"Error generating speech: {e}")
             raise
+
+
+
+    def extract_file_extension(self, url: str, content_type: str = "") -> str:
+        """Extract file extension from URL or content type"""
+        content_type_lower = content_type.lower()
+        
+        if 'mp3' in content_type_lower or url.endswith('.mp3'):
+            return '.mp3'
+        elif 'wav' in content_type_lower or url.endswith('.wav'):
+            return '.wav'
+        elif 'm4a' in content_type_lower or url.endswith('.m4a'):
+            return '.m4a'
+        elif 'ogg' in content_type_lower or url.endswith('.ogg'):
+            return '.ogg'
+        elif 'jpeg' in content_type_lower or 'jpg' in content_type_lower:
+            return '.jpg'
+        elif 'png' in content_type_lower or url.endswith('.png'):
+            return '.png'
+        elif 'gif' in content_type_lower or url.endswith('.gif'):
+            return '.gif'
+        elif 'webp' in content_type_lower or url.endswith('.webp'):
+            return '.webp'
+        
+        if 'audio' in content_type_lower:
+            return '.mp3'
+        elif 'image' in content_type_lower:
+            return '.jpg'
+        
+        return ''
+    
+    def format_file_size(self, size_bytes: int) -> str:
+        """Format file size in human readable format"""
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.2f} TB"
     
     def create_embedding(self, text: str) -> list:
         """Create embedding for text"""
