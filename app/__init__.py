@@ -44,3 +44,14 @@ def create_app(config_class=Config):
         return {"status": "healthy", "message": "Benova Backend API is running"}
     
     return app
+
+
+def initialize_protection_system():
+    """Inicializar protección después de crear la app"""
+    try:
+        # Debe ejecutarse después de que modern_rag_system esté disponible
+        from app.services.vectorstore_service import apply_vectorstore_protection
+        apply_vectorstore_protection()
+        logger.info("✅ Vectorstore protection applied")
+    except Exception as e:
+        logger.warning(f"Could not apply vectorstore protection: {e}")
