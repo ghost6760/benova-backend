@@ -321,3 +321,27 @@ class ChatwootService:
         except Exception as e:
             logger.exception(f"Error processing incoming message")
             raise
+
+
+    def debug_webhook_data(self, data: Dict[str, Any]):
+        """Función para debugging completo del webhook de Chatwoot"""
+        logger.info("🔍 === WEBHOOK DEBUG INFO ===")
+        logger.info(f"Event: {data.get('event')}")
+        logger.info(f"Message ID: {data.get('id')}")
+        logger.info(f"Message Type: {data.get('message_type')}")
+        logger.info(f"Content: '{data.get('content')}'")
+        logger.info(f"Content Length: {len(data.get('content', ''))}")
+        
+        attachments = data.get('attachments', [])
+        logger.info(f"Attachments Count: {len(attachments)}")
+        
+        for i, att in enumerate(attachments):
+            logger.info(f"  Attachment {i}:")
+            logger.info(f"    Keys: {list(att.keys())}")
+            logger.info(f"    Type: {att.get('type')}")
+            logger.info(f"    File Type: {att.get('file_type')}")
+            logger.info(f"    URL: {att.get('url')}")
+            logger.info(f"    Data URL: {att.get('data_url')}")
+            logger.info(f"    Thumb URL: {att.get('thumb_url')}")
+        
+        logger.info("🔍 === END DEBUG INFO ===")
