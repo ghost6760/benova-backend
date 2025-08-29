@@ -1,6 +1,11 @@
 // Configuración
-const API_BASE = 'https://appopenia-production.up.railway.app/'; // Ajusta según tu URL
-let currentUserId = 'test_user'; // ID de usuario para pruebas
+const API_BASE = 'https://appopenia-production.up.railway.app/';
+let currentUserId = 'test_user';
+
+// Variables globales para multimedia
+let mediaRecorder;
+let audioChunks = [];
+let cameraStream;
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Cargar documentos al iniciar
 async function loadDocuments() {
     try {
-        const response = await fetch(`${API_BASE}/documents`);
+        const response = await fetch(`${API_BASE}documents`);
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -89,7 +94,36 @@ function setupEventListeners() {
         await cleanupOrphanedVectors();
     });
 
-    // Handler para archivo de voz
+    // Botón de grabar voz
+    document.getElementById('recordVoiceBtn').addEventListener('click', async () => {
+        await startVoiceRecording();
+    });
+
+    // Botón de parar grabación
+    document.getElementById('stopRecordingBtn').addEventListener('click', () => {
+        stopVoiceRecording();
+    });
+
+    // Botón de capturar imagen
+    document.getElementById('captureImageBtn').addEventListener('click', async () => {
+        await startCameraCapture();
+    });
+
+    // Botón de tomar foto
+    document.getElementById('takePictureBtn').addEventListener('click', () => {
+        takePicture();
+    });
+
+    // Botones del modal de cámara
+    document.getElementById('closeCameraBtn').addEventListener('click', () => {
+        closeCameraModal();
+    });
+
+    document.getElementById('cancelCameraBtn').addEventListener('click', () => {
+        closeCameraModal();
+    });
+
+    // Handler para archivo de voz (fallback)
     document.getElementById('voiceFile').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -101,10 +135,10 @@ function setupEventListeners() {
         } catch (error) {
             alert(`❌ Error: ${error.message}`);
         }
-        e.target.value = ''; // Limpiar input
+        e.target.value = '';
     });
 
-    // Handler para imagen
+    // Handler para imagen (fallback)
     document.getElementById('imageFile').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -116,17 +150,104 @@ function setupEventListeners() {
         } catch (error) {
             alert(`❌ Error: ${error.message}`);
         }
-        e.target.value = ''; // Limpiar input
+        e.target.value = '';
     });
 }
 
-// Función para enviar mensaje de voz
+// Funciones de grabación de voz
+async function startVoiceRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const audioFile = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
+            
+            try {
+                const response = await sendVoiceMessage(audioFile);
+                displayMessage('user', '🎤 Mensaje de voz grabado');
+                displayMessage('bot', response);
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+            }
+
+            // Limpiar stream
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        document.getElementById('recordingStatus').style.display = 'block';
+        
+    } catch (error) {
+        alert('Error accediendo al micrófono: ' + error.message);
+    }
+}
+
+function stopVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        document.getElementById('recordingStatus').style.display = 'none';
+    }
+}
+
+// Funciones de captura de imagen
+async function startCameraCapture() {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.getElementById('cameraVideo');
+        video.srcObject = cameraStream;
+        
+        document.getElementById('cameraModal').style.display = 'block';
+        
+    } catch (error) {
+        alert('Error accediendo a la cámara: ' + error.message);
+    }
+}
+
+function takePicture() {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('cameraCanvas');
+    const context = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
+
+    canvas.toBlob(async (blob) => {
+        const imageFile = new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' });
+        
+        try {
+            const response = await sendImageMessage(imageFile);
+            displayMessage('user', '📸 Imagen capturada');
+            displayMessage('bot', response);
+            closeCameraModal();
+        } catch (error) {
+            alert(`❌ Error: ${error.message}`);
+        }
+    }, 'image/jpeg', 0.8);
+}
+
+function closeCameraModal() {
+    document.getElementById('cameraModal').style.display = 'none';
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+}
+
+// Función para enviar mensaje de voz (CORREGIDA)
 async function sendVoiceMessage(audioFile) {
     const formData = new FormData();
     formData.append('audio', audioFile);
     formData.append('user_id', currentUserId);
 
-    const response = await fetch(`${API_BASE}/process-voice`, {
+    const response = await fetch(`${API_BASE}multimedia/process-voice`, {
         method: 'POST',
         body: formData
     });
@@ -139,14 +260,14 @@ async function sendVoiceMessage(audioFile) {
     }
 }
 
-// Función para enviar imagen
+// Función para enviar imagen (CORREGIDA)
 async function sendImageMessage(imageFile) {
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('user_id', currentUserId);
-    formData.append('question', '¿Qué hay en esta imagen?'); // Opcional
+    formData.append('question', '¿Qué hay en esta imagen?');
 
-    const response = await fetch(`${API_BASE}/process-image`, {
+    const response = await fetch(`${API_BASE}multimedia/process-image`, {
         method: 'POST',
         body: formData
     });
@@ -162,7 +283,7 @@ async function sendImageMessage(imageFile) {
 // Función para limpiar vectores huérfanos
 async function cleanupOrphanedVectors() {
     try {
-        const response = await fetch(`${API_BASE}/documents/cleanup`, {
+        const response = await fetch(`${API_BASE}documents/cleanup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dry_run: false })
@@ -171,7 +292,7 @@ async function cleanupOrphanedVectors() {
         const data = await response.json();
         if (data.status === 'success') {
             alert(`✅ Limpieza completada: ${data.orphaned_vectors_deleted} vectores eliminados`);
-            await loadDocuments(); // Recargar para actualizar conteos
+            await loadDocuments();
         } else {
             alert(`❌ Error: ${data.message}`);
         }
@@ -184,7 +305,7 @@ async function cleanupOrphanedVectors() {
 // Función para ver vectores de un documento
 async function viewVectors(docId) {
     try {
-        const response = await fetch(`${API_BASE}/documents/${docId}/vectors`);
+        const response = await fetch(`${API_BASE}documents/${docId}/vectors`);
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -197,7 +318,6 @@ async function viewVectors(docId) {
             });
             vectorsHtml += `</ul>`;
             
-            // Mostrar en un modal o alert
             alert(vectorsHtml);
         } else {
             alert(`❌ Error: ${data.message}`);
@@ -210,7 +330,7 @@ async function viewVectors(docId) {
 
 // Agregar documento individual
 async function addDocument(content, metadata) {
-    const response = await fetch(`${API_BASE}/documents`, {
+    const response = await fetch(`${API_BASE}documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, metadata })
@@ -240,7 +360,7 @@ async function processFiles(files) {
 async function bulkAddDocuments(documents) {
     const payload = { documents: documents.map(doc => ({ content: doc.content, metadata: doc.metadata })) };
     
-    const response = await fetch(`${API_BASE}/documents/bulk`, {
+    const response = await fetch(`${API_BASE}documents/bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -292,7 +412,7 @@ function renderDocuments(documents) {
             const docId = e.target.getAttribute('data-doc-id');
             if (confirm(`¿Estás seguro de eliminar el documento con ID ${docId}?`)) {
                 await deleteDocument(docId);
-                await loadDocuments(); // Recargar la lista
+                await loadDocuments();
             }
         });
     });
@@ -301,12 +421,12 @@ function renderDocuments(documents) {
 // Listar documentos y vectores
 async function listDocumentsAndVectors() {
     try {
-        const response = await fetch(`${API_BASE}/documents`);
+        const response = await fetch(`${API_BASE}documents`);
         const data = await response.json();
         
         if (data.status === 'success') {
             const documents = data.documents;
-            renderDocuments(documents); // Reutiliza la función de renderizado
+            renderDocuments(documents);
         }
     } catch (error) {
         console.error('Error listando documentos y vectores:', error);
@@ -317,7 +437,7 @@ async function listDocumentsAndVectors() {
 // Eliminar documento
 async function deleteDocument(docId) {
     try {
-        const response = await fetch(`${API_BASE}/documents/${docId}`, {
+        const response = await fetch(`${API_BASE}documents/${docId}`, {
             method: 'DELETE'
         });
         
@@ -335,7 +455,7 @@ async function deleteDocument(docId) {
 
 // Enviar mensaje al chatbot
 async function sendChatMessage(message) {
-    const response = await fetch(`${API_BASE}/conversations/${currentUserId}/test`, {
+    const response = await fetch(`${API_BASE}conversations/${currentUserId}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
