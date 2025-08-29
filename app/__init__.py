@@ -56,6 +56,26 @@ def initialize_protection_system():
     except Exception as e:
         logger.warning(f"Could not apply vectorstore protection: {e}")
 
+def startup_checks():
+    """Verificaciones completas de inicio"""
+    try:
+        # Validar Redis
+        redis_client.ping()
+        
+        # Validar OpenAI
+        openai_service = OpenAIService()
+        if not openai_service.validate_openai_setup():
+            raise Exception("OpenAI validation failed")
+        
+        # Validar Vectorstore
+        vectorstore_service = VectorstoreService()
+        vectorstore_service.test_connection()
+        
+        logger.info("All startup checks passed")
+        return True
+    except Exception as e:
+        logger.error(f"Startup check failed: {e}")
+        raise
 
 @app.before_request
 def ensure_vectorstore_health():
