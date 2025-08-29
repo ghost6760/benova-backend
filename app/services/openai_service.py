@@ -69,6 +69,21 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"OpenAI connection test failed: {e}")
             raise
+
+
+    def validate_openai_setup() -> bool:
+        """Validar configuración completa de OpenAI"""
+        try:
+            # Test de conexión básico
+            response = self.client.chat.completions.create(
+                model="gpt-4.1-mini-2025-04-14",
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=1
+            )
+            return True
+        except Exception as e:
+            logger.error(f"OpenAI validation failed: {e}")
+            return False
     
     def generate_response(self, messages: list, **kwargs) -> str:
         """Generate response using OpenAI Chat API"""
@@ -293,7 +308,8 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"Error creating embedding: {e}")
             raise
-    
+
+        
     def get_system_info(self) -> Dict[str, Any]:
         """Get OpenAI service system information"""
         return {
