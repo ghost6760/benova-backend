@@ -12,7 +12,7 @@ class Config:
     
     # OpenAI
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    MODEL_NAME = os.getenv('MODEL_NAME', 'gpt-4o-mini')
+    MODEL_NAME = os.getenv('MODEL_NAME', 'gpt-4.1-mini-2025-04-14')
     EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'text-embedding-3-small')
     MAX_TOKENS = int(os.getenv('MAX_TOKENS', 1500))
     TEMPERATURE = float(os.getenv('TEMPERATURE', 0.7))
