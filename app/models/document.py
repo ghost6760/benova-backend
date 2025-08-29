@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib
 import json
 import logging
+import time  # Missing import
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
