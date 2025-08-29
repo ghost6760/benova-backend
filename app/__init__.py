@@ -1,4 +1,4 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, send_file
 from app.config import Config
 from app.utils.error_handlers import register_error_handlers
 from app.services.redis_service import init_redis
@@ -9,6 +9,7 @@ import logging
 import sys
 import threading
 import time
+import os
 
 def create_app(config_class=Config):
     """Factory pattern para crear la aplicación Flask"""
@@ -69,21 +70,42 @@ def create_app(config_class=Config):
     app.register_blueprint(multimedia.bp, url_prefix='/multimedia')
     app.register_blueprint(admin.bp, url_prefix='/admin')
     
-    # Registrar error handlers
-    register_error_handlers(app)
-    
-    # Root route
-    @app.route('/')
-    def index():
-        return {"status": "healthy", "message": "Benova Backend API is running"}
-
+    # CORREGIDO: Un solo decorador para la ruta raíz
     @app.route('/')
     def serve_frontend():
-        return send_from_directory('.', 'index.html')
+        """Servir el frontend o respuesta API según disponibilidad"""
+        try:
+            # Intentar servir index.html si existe
+            if os.path.exists('index.html'):
+                return send_file('index.html')
+            else:
+                # Fallback a respuesta JSON si no hay frontend
+                return {"status": "healthy", "message": "Benova Backend API is running"}
+        except Exception as e:
+            logger.error(f"Error serving frontend: {e}")
+            return {"status": "healthy", "message": "Benova Backend API is running"}
     
     @app.route('/<path:filename>')
     def serve_static(filename):
-        return send_from_directory('.', filename)
+        """Servir archivos estáticos del frontend"""
+        # Lista de archivos permitidos para seguridad
+        allowed_files = ['style.css', 'script.js', 'index.html', 'favicon.ico']
+        
+        if filename in allowed_files:
+            try:
+                if os.path.exists(filename):
+                    return send_file(filename)
+                else:
+                    return {"status": "error", "message": "File not found"}, 404
+            except Exception as e:
+                logger.error(f"Error serving static file {filename}: {e}")
+                return {"status": "error", "message": "Error serving file"}, 500
+        else:
+            # Para archivos no permitidos, retornar respuesta API
+            return {"status": "error", "message": "File not allowed"}, 403
+    
+    # Registrar error handlers
+    register_error_handlers(app)
     
     # ENHANCED: Inicializar sistemas de protección después de crear la app
     with app.app_context():
