@@ -4,15 +4,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    """Configuración base"""
+    """Configuración base - UNIFIED with monolith"""
     # Flask
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
     DEBUG = False
     TESTING = False
     
-    # OpenAI
+    # OpenAI - UNIFIED MODEL CONFIG
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-    MODEL_NAME = os.getenv('MODEL_NAME', 'gpt-4.1-mini-2025-04-14')
+    MODEL_NAME = os.getenv('MODEL_NAME', 'gpt-4o-mini')  # UNIFIED: Same as monolith
     EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'text-embedding-3-small')
     MAX_TOKENS = int(os.getenv('MAX_TOKENS', 1500))
     TEMPERATURE = float(os.getenv('TEMPERATURE', 0.7))
@@ -34,26 +34,35 @@ class Config:
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     
-    # Features
+    # Features - ENHANCED like monolith
     VOICE_ENABLED = os.getenv('VOICE_ENABLED', 'false').lower() == 'true'
     IMAGE_ENABLED = os.getenv('IMAGE_ENABLED', 'false').lower() == 'true'
     
-    # Schedule Service
+    # Schedule Service - EXACTLY like monolith
     SCHEDULE_SERVICE_URL = os.getenv('SCHEDULE_SERVICE_URL', 'http://127.0.0.1:4040')
     ENVIRONMENT = os.getenv('ENVIRONMENT', 'production')
 
-    API_KEY = os.getenv('API_KEY')  # Para endpoints de admin
+    # Security (for admin endpoints)
+    API_KEY = os.getenv('API_KEY')
+    
+    # AUTO-RECOVERY SETTINGS (NEW - from monolith)
+    VECTORSTORE_AUTO_RECOVERY = os.getenv('VECTORSTORE_AUTO_RECOVERY', 'true').lower() == 'true'
+    VECTORSTORE_HEALTH_CHECK_INTERVAL = int(os.getenv('VECTORSTORE_HEALTH_CHECK_INTERVAL', 30))
+    VECTORSTORE_RECOVERY_TIMEOUT = int(os.getenv('VECTORSTORE_RECOVERY_TIMEOUT', 60))
 
 class DevelopmentConfig(Config):
     DEBUG = True
     LOG_LEVEL = 'DEBUG'
+    ENVIRONMENT = 'development'
 
 class ProductionConfig(Config):
     DEBUG = False
+    ENVIRONMENT = 'production'
 
 class TestingConfig(Config):
     TESTING = True
     REDIS_URL = 'redis://localhost:6379/1'  # Different DB for testing
+    ENVIRONMENT = 'testing'
 
 config = {
     'development': DevelopmentConfig,
