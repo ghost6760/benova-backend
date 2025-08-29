@@ -1,9 +1,9 @@
-from .settings import Config, DevelopmentConfig, ProductionConfig, TestingConfig
-from .constants import *
+from .settings import Config, DevelopmentConfig, ProductionConfig, TestingConfig, config
 
 __all__ = [
     'Config',
     'DevelopmentConfig',
     'ProductionConfig',
-    'TestingConfig'
+    'TestingConfig',
+    'config'
 ]
