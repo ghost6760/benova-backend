@@ -3,7 +3,7 @@ from app.config import Config
 from app.utils.error_handlers import register_error_handlers
 from app.services.redis_service import init_redis
 from app.services.vectorstore_service import init_vectorstore
-from app.services.openai_service import init_openai
+from app.services.openai_service import init_openai  # This import was missing
 import logging
 import sys
 
@@ -14,7 +14,7 @@ def create_app(config_class=Config):
     
     # Configurar logging
     logging.basicConfig(
-        level=app.config['LOG_LEVEL'],
+        level=app.config.get('LOG_LEVEL', 'INFO'),
         format="%(asctime)s [%(levelname)s] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)]
     )
@@ -38,9 +38,9 @@ def create_app(config_class=Config):
     # Registrar error handlers
     register_error_handlers(app)
     
-    # Rutas estáticas
+    # Root route
     @app.route('/')
     def index():
-        return app.send_static_file('index.html')
+        return {"status": "healthy", "message": "Benova Backend API is running"}
     
     return app
