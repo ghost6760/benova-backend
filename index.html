@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Benova Bot - Panel de Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Panel de Control - Benova Bot</h1>
+        </header>
+
+        <!-- Sección de Documentos -->
+        <section class="document-section">
+            <h2>Gestión de Documentos</h2>
+            
+            <!-- Agregar Documento Individual -->
+            <div class="card">
+                <h3>Agregar Documento</h3>
+                <form id="addDocumentForm">
+                    <textarea id="docContent" placeholder="Contenido del documento..."></textarea>
+                    <input type="text" id="docMetadata" placeholder='Metadata (JSON, ej: {"categoria": "informacion"})'>
+                    <button type="submit">Agregar</button>
+                </form>
+            </div>
+
+            <!-- Bulk Upload -->
+            <div class="card">
+                <h3>Subir Múltiples Documentos</h3>
+                <form id="bulkUploadForm">
+                    <input type="file" id="bulkFiles" multiple accept=".txt,.md,.docx">
+                    <button type="submit">Subir Archivos</button>
+                </form>
+            </div>
+
+            <!-- Lista de Documentos -->
+            <div class="card">
+                <h3>Documentos Almacenados</h3>
+                <button id="listDocumentsBtn" class="btn-secondary">Listar Documentos y Vectores</button>
+                <button id="cleanupVectorsBtn" class="btn-secondary">Limpiar Vectores Huérfanos</button>
+                <div id="documentsList" class="documents-grid"></div>
+            </div>
+        </section>
+
+        <!-- Sección de Chat -->
+        <section class="chat-section">
+            <h2>Probar Chatbot</h2>
+            <div id="chatHistory" class="chat-container"></div>
+            
+            <!-- Formulario de chat existente -->
+            <form id="chatForm">
+                <input type="text" id="userMessage" placeholder="Escribe tu mensaje...">
+                <button type="submit">Enviar</button>
+            </form>
+
+            <!-- Nuevos controles para multimedia -->
+            <div class="multimedia-controls">
+                <input type="file" id="voiceFile" accept="audio/*" hidden>
+                <label for="voiceFile" class="btn-secondary">🎤 Voz</label>
+                
+                <input type="file" id="imageFile" accept="image/*" hidden>
+                <label for="imageFile" class="btn-secondary">🖼️ Imagen</label>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
